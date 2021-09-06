@@ -1,0 +1,20 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pycryptodome = "*"
+httpx = "*"
+loguru = "*"
+bs4 = "*"
+lxml = "*"
+numpy = "*"
+pillow = "*"
+pydantic = "*"
+nb-cli = "*"
+nonebot-adapter-cqhttp = "*"
+nonebot-plugin-apscheduler
+
+[requires]
+python_version = "3.9"
