@@ -44,7 +44,7 @@ async def anti_cpdaily_check_routine():
     users = list()
     for cfg in configs:
         if cfg.endswith('config.json'):
-            with open(config_path / cfg) as f:
+            with open(config_path / cfg, encoding='utf-8') as f:
                 data = json.load(f)
             user_data = UserConfig(**data)
             users.append(user_data)

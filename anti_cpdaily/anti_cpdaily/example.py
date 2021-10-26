@@ -46,7 +46,7 @@ async def example_helper(
             form_example = form.generate_config()
             current_user.collections.append(form_example)
     config_path = config_path if config_path != None else '{}.config.json'.format(current_user.username)
-    with open(config_path, 'w') as f:
+    with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(current_user.dict(), f, ensure_ascii=False, indent='  ')
 
 def generate_config(*args, **kwargs):
