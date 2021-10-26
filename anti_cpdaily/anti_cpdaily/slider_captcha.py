@@ -22,11 +22,7 @@ def solve_captcha(data: dict) -> Optional[Dict[str, int]]:
     """
     # load and convert image
     im_big = Image.open(BytesIO(base64.b64decode(data.get('bigImage')))).convert('RGBA')
-    # background = Image.new('RGBA', im_big.size, (0,0,0))
-    # im_big_com = Image.alpha_composite(background, im_big)
     im_small = Image.open(BytesIO(base64.b64decode(data.get('smallImage')))).convert('RGBA')
-    # background = Image.new('RGBA', im_small.size, (0,0,0))
-    # im_small_com = Image.alpha_composite(background, im_small)
 
     # use them as arrays
     ar_big = np.array(im_big)

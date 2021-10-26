@@ -13,7 +13,7 @@ if not profile_path.exists():
 else:
     logger.info('check ok, loading tasks')
     from .schedule import (
-        check_collection_form_at_6_8_10_12,
+        anti_cpdaily_check_routine,
         anti_cpdaily_launch
     )
     

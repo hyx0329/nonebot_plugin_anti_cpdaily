@@ -9,8 +9,8 @@ class UserConfig(BaseModel):
     address: str = ''
     longitude: Optional[float] = None
     latitude: Optional[float] = None
-    collections: List[Dict] = []
     qq: Optional[int] = None
+    collections: List[Dict] = []
 
     class Config:
         extra = 'allow'
