@@ -14,7 +14,7 @@ pillow = "*"
 pydantic = "*"
 nb-cli = "*"
 nonebot-adapter-cqhttp = "*"
-nonebot-plugin-apscheduler
+nonebot-plugin-apscheduler = "*"
 
 [requires]
 python_version = "3.9"
