@@ -58,6 +58,7 @@ class AsyncCpdailyUser:
     async def shutdown(self):
         if isinstance(self.client, AsyncClient):
             await self.client.aclose()
+            self.client = None
 
     async def login(self) -> bool:
         logger.info('start to login')

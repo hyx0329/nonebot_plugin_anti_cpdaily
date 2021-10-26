@@ -1,10 +1,11 @@
 from typing import Optional, Dict, List, Callable
-from Crypto.Cipher import DES
+from Crypto.Cipher import DES, AES
 from Crypto.Util.Padding import pad
 from datetime import datetime
 from httpx import AsyncClient
 from copy import deepcopy
 import base64, json, uuid
+import hashlib
 from loguru import logger
 
 from .base import AsyncBaseTask
@@ -20,6 +21,48 @@ def _des_encrypt_b64(text: str) -> str:
     encrypted = des.encrypt(data_to_en)
     result = base64.b64encode(encrypted).decode('utf-8')
     return result
+
+
+def _aes_encrypt_b64(text: str) -> str:
+    key = b'ytUQ7l2ZZu8mLvJZ'
+    iv = b'\x01\x02\x03\x04\x05\x06\x07\x08\t\x01\x02\x03\x04\x05\x06\x07'
+    aes = AES.new(key=key, mode=AES.MODE_CBC, iv=iv)
+    data_to_en = pad(text.encode('utf-8'), block_size=8, style='pkcs7')
+    encrypted = aes.encrypt(data_to_en)
+    result = base64.b64encode(encrypted).decode('utf-8')
+    return result
+
+
+def _generate_extension_signature(extension: Dict) -> str:
+    """extract data from extension and generate signature
+
+    Args:
+        extension (Dict): extention
+
+    Returns:
+        str: signature
+    """
+    data_tosign = {
+        "appVersion": CPDAILY_APP_VERSION,
+        "bodyString": extension.get('bodyString'),
+        "deviceId": extension.get("deviceId"),
+        "lat": extension.get("lat"),
+        "lon": extension.get("lon"),
+        "model": extension.get("model"),
+        "systemName": extension.get("systemName"),
+        "systemVersion": extension.get("systemVersion"),
+        "userId": extension.get("userId"),
+    }
+
+    kv_pairs = list()
+
+    for key, value in zip(form.keys(), form.values()):
+        kv_pairs.append("{}={}".format(key,value))
+    
+    kv_pairs.append(CPDAILY_KEY_AES.decode('utf-8'))
+    string_to_hash = "&".join(kv_pairs)
+    signature = hashlib.md5(string_to_hash.encode('utf-8')).hexdigest()
+    return signature
 
 
 class Form:
@@ -77,7 +120,7 @@ class Form:
         # check client, generate new if required
         if not isinstance(client, AsyncClient):
             client = AsyncClient()  # i dont think it will work without cookies
-        
+
         # load form decription, extract schoolTaskWid
         source_url = root + URI_FORM_DETAIL
         payload = {'collectorWid': self.wid}
@@ -89,7 +132,7 @@ class Form:
         self.description = res_j.get('datas')
         logger.debug(f'Form({self.wid}) description: {self.description}')
         self.school_task_wid = self.description.get('collector').get('schoolTaskWid')
-        
+
         # then fetch form entries(fields)
         form_entries_url = root + URI_FORM_ENTRIES
         payload = {
@@ -105,7 +148,7 @@ class Form:
         logger.debug(f'server response status: code({response_code}), msg({response_message})')
         self.form_data = res_j.get('datas')
         logger.debug(f'form({self.wid}) data: {self.form_data}')
-    
+
     def fill_form(self, user_data: Dict) -> bool:
         """fill form with given data, also set user data
 
@@ -141,7 +184,7 @@ class Form:
             item_col_name = current_form_item.get('colName')
             logger.info('next item: "{}"'.format(item_col_name))
             logger.info('item title: "{}"'.format(item_title))
-            
+
             matched_item = None
             for uitem in user_defined_form_data:  # scanning user provided form data
                 # compare items
@@ -161,7 +204,7 @@ class Form:
                 logger.warning('missing definition for "{}"'.format(item_title))
                 logger.warning('form detail: {}'.format(current_form_item))
                 return False
-            # fill this item        
+            # fill this item
             new_item = deepcopy(current_form_item)
             logger.debug('fill in item: "{}"'.format(new_item))
             item_type = new_item.get('fieldType')
@@ -171,13 +214,13 @@ class Form:
                 return False
             logger.debug(f'current user definition: {matched_item}')
             logger.debug(f'answer candidates: {answer}')
-            
+
             if item_type in {'1', '5'}:  # text
                 if not len(answer) == 1:
                     logger.warning('expecting one answer but got {}'.format(len(answer)))
                     return False
                 new_item['value'] = answer[0]
-            
+
             elif item_type in {'2', '3'}:  # single/multiple choice
                 # only keep those content is in answer
                 if item_type == '2':
@@ -189,14 +232,14 @@ class Form:
                 for choice in new_item.get('fieldItems', []):
                     if choice.get('content') in answer:
                         new_field_items.append(choice)
-                
+
                 logger.debug('fill with: {}'.format(new_field_items))
                 if not len(new_field_items) > 0:
                     logger.warning('no choice made, bug?')
                     return False
                 new_item['fieldItems'] = new_field_items
                 new_item['value'] = ' '.join(map(lambda x: x['content'], new_field_items))
-            
+
             elif item_type == '4':  # ignored choice ?
                 logger.warning('found type-4 item, but dont know what to do')
                 pass
@@ -209,7 +252,7 @@ class Form:
         self.form_to_submit = form_filled
         logger.debug('form to submit: {}'.format(form_filled))
         return True
-        
+
     def generate_config(self, only_required: bool = True) -> Optional[Dict]:
         """generate a user-friendly form example
 
@@ -268,29 +311,40 @@ class Form:
             return False
         # cpdaily encrypted 'Cpdaily-Extension'
         # TODO: utilize 'fetchStuLocation' from original form detail
-        extension = {
-            "model": "OPPO R11 Plus",
-            "appVersion": "8.2.14",
-            "systemVersion": "9.1.0",
-            "userId": self.user_data.get('username'),
-            "systemName": "android",
-            "lon": self.user_data.get('longitude'),
-            "lat": self.user_data.get('latitude'),
-            "deviceId": self.user_data.get('device_uuid', str(uuid.uuid1()))
-        }
-        # cpdaily extra headers
-        headers = {
-            'CpdailyStandAlone': '0',
-            'extension': '1',
-            'Cpdaily-Extension': _des_encrypt_b64(json.dumps(extension))
-        }
+
         payload = {
             "formWid": self.form_wid,
             "address": self.user_data.get('address'),
             "collectWid": self.wid,
             "schoolTaskWid": self.school_task_wid,
             "form": self.form_to_submit,
-            "uaIsCpadaily": True
+            "uaIsCpadaily": True,
+            "signVersion": "1.0.0"
+        }
+
+        extension = {
+            "appVersion": APP_VERSION,
+            "model": "OPPO R11 Plus",
+            "systemName": "android",
+            "systemVersion": "9.1.0",
+            "userId": self.user_data.get('username'),
+            "lon": self.user_data.get('longitude'),
+            "lat": self.user_data.get('latitude'),
+            "deviceId": self.user_data.get('device_uuid', str(uuid.uuid1())),
+            "calVersion": "firstv",
+            "version": "first_v2",
+            "bodyString": _aes_encrypt_b64(json.dumps(payload)),
+        }
+
+        signature = _generate_extension_signature(extension)
+        extension['sign'] = signature
+
+        # cpdaily extra headers
+        headers = {
+            'CpdailyStandAlone': '0',
+            'extension': '1',
+            'sign': '1',
+            'Cpdaily-Extension': _des_encrypt_b64(json.dumps(extension))
         }
 
         submit_url = root + URI_FORM_SUBMIT
@@ -326,7 +380,7 @@ class AsyncCollectionTask(AsyncBaseTask):
         self.user = user
         self.form_list = None
         self.form_ans = form_ans
-    
+
     async def fetch_form(self):
         client = self.user.client
         school_api = self.user.school_api
@@ -348,4 +402,3 @@ class AsyncCollectionTask(AsyncBaseTask):
         for form_summary in data.get('rows'):
             form_list.append(Form(form_summary))
         self.form_list = form_list
-        

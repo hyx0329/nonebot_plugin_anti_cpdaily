@@ -1,3 +1,9 @@
+CPDAILY_APP_VERSION = "9.0.12"
+CPDAILY_KEY_AES = b'ytUQ7l2ZZu8mLvJZ'
+CPDAILY_KEY_AES_IV = b'\x01\x02\x03\x04\x05\x06\x07\x08\t\x01\x02\x03\x04\x05\x06\x07'
+CPDAILY_KEY_DES = b'b3L26XNL'
+CPDAILY_KEY_DES_IV = b'\x01\x02\x03\x04\x05\x06\x07\x08'
+
 USER_AGENT = 'Mozilla/5.0 (Linux; U; Android 8.1.0; zh-cn; BLA-AL00 Build/HUAWEIBLA-AL00) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/8.9 Mobile Safari/537.36'
 
 URL_SCHOOL_LIST = 'https://mobile.campushoy.com/v6/config/guest/tenant/list'
