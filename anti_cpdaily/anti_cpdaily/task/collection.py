@@ -27,7 +27,7 @@ def _aes_encrypt_b64(text: str) -> str:
     key = b'ytUQ7l2ZZu8mLvJZ'
     iv = b'\x01\x02\x03\x04\x05\x06\x07\x08\t\x01\x02\x03\x04\x05\x06\x07'
     aes = AES.new(key=key, mode=AES.MODE_CBC, iv=iv)
-    data_to_en = pad(text.encode('utf-8'), block_size=8, style='pkcs7')
+    data_to_en = pad(text.encode('utf-8'), block_size=16, style='pkcs7')
     encrypted = aes.encrypt(data_to_en)
     result = base64.b64encode(encrypted).decode('utf-8')
     return result
@@ -43,7 +43,7 @@ def _generate_extension_signature(extension: Dict) -> str:
         str: signature
     """
     data_tosign = {
-        "appVersion": CPDAILY_APP_VERSION,
+        "appVersion": extension.get('appVersion'),
         "bodyString": extension.get('bodyString'),
         "deviceId": extension.get("deviceId"),
         "lat": extension.get("lat"),
@@ -56,7 +56,7 @@ def _generate_extension_signature(extension: Dict) -> str:
 
     kv_pairs = list()
 
-    for key, value in zip(form.keys(), form.values()):
+    for key, value in zip(extension.keys(), extension.values()):
         kv_pairs.append("{}={}".format(key,value))
     
     kv_pairs.append(CPDAILY_KEY_AES.decode('utf-8'))
@@ -70,6 +70,7 @@ class Form:
     subject: str
     wid: Optional[str]
     form_wid: Optional[str]
+    instance_wid: Optional[int]
     school_task_wid: Optional[str]
     source: Optional[str]
     issuer: Optional[str]
@@ -94,6 +95,7 @@ class Form:
         self.subject: str = data.get('subject')
         self.wid: Optional[str] = data.get('wid')
         self.form_wid: Optional[str] = data.get('formWid')
+        self.instance_wid: Optional[int] = data.get('instanceWid')
         self.source: Optional[str] = data.get('content')
         self.issuer: Optional[str] = data.get('senderUserName')
         self.priority: Optional[str] = data.get('priority')
@@ -123,7 +125,10 @@ class Form:
 
         # load form decription, extract schoolTaskWid
         source_url = root + URI_FORM_DETAIL
-        payload = {'collectorWid': self.wid}
+        payload = {
+            "collectorWid": self.wid,
+            "instanceWid": self.instance_wid
+        }
         res = await client.post(source_url, json=payload, timeout=10)
         res_j = res.json()
         response_code = res_j.get('code')
@@ -293,11 +298,11 @@ class Form:
         logger.debug(f'form example: {form_example}')
         return form_example
 
-    async def post_form(self, root: str, client: AsyncClient) -> bool:
+    async def post_form(self, apis: Dict, client: AsyncClient) -> bool:
         """post form to cpdaily
 
         Args:
-            root (str): server root (amp_root)
+            apis (Dict): necessary school info (amp_root, tenant_id)
             client (AsyncClient): client to use
 
         Returns:
@@ -309,47 +314,68 @@ class Form:
         if not isinstance(self.form_to_submit, list):
             logger.warning('form not filled, perhaps no matching form found')
             return False
-        # cpdaily encrypted 'Cpdaily-Extension'
-        # TODO: utilize 'fetchStuLocation' from original form detail
+
+        root = apis.get('amp_root')
+        tenant_id = apis.get('tenant_id')
 
         payload = {
             "formWid": self.form_wid,
+            "instanceWid": self.instance_wid,
             "address": self.user_data.get('address'),
             "collectWid": self.wid,
             "schoolTaskWid": self.school_task_wid,
             "form": self.form_to_submit,
-            "uaIsCpadaily": True,
-            "signVersion": "1.0.0"
+            "uaIsCpadaily": True
         }
 
+        # UUID use username and school name as seed
+        generated_device_uuid = self.user_data.get('device_uuid', None)
+        if generated_device_uuid == None:
+            seed_string = self.user_data.get('username') + self.user_data.get('school_name')
+            seed_hash = hashlib.md5(seed_string.encode('utf-8'))
+            seed = int(seed_hash.hexdigest(), 16)
+            generated_device_uuid = str(uuid.UUID(int=seed))
+
+        # cpdaily encrypted 'Cpdaily-Extension'
+        # extension works as a wrapper of payload
+        # part of it is used to verify the authenticity of data
+        # it has taken the place of json of the request since cpdaily 9.x
+        # (before that, json=payload)
+        # TODO: utilize 'fetchStuLocation' from original form detail 
         extension = {
-            "appVersion": APP_VERSION,
-            "model": "OPPO R11 Plus",
+            "appVersion": CPDAILY_APP_VERSION,
+            "model": "MI 6",
             "systemName": "android",
-            "systemVersion": "9.1.0",
+            "systemVersion": "7.1.1",
             "userId": self.user_data.get('username'),
             "lon": self.user_data.get('longitude'),
             "lat": self.user_data.get('latitude'),
-            "deviceId": self.user_data.get('device_uuid', str(uuid.uuid1())),
+            "deviceId": generated_device_uuid,
             "calVersion": "firstv",
-            "version": "first_v2",
-            "bodyString": _aes_encrypt_b64(json.dumps(payload)),
+            "version": "first_v2"
         }
 
+        partial_extension = _des_encrypt_b64(json.dumps(extension))
+
+        body_string = _aes_encrypt_b64(json.dumps(payload))
         signature = _generate_extension_signature(extension)
+        extension['bodyString'] = body_string
         extension['sign'] = signature
 
         # cpdaily extra headers
         headers = {
+            'tenantId': tenant_id,
             'CpdailyStandAlone': '0',
             'extension': '1',
             'sign': '1',
-            'Cpdaily-Extension': _des_encrypt_b64(json.dumps(extension))
+            'Cpdaily-Extension': _des_encrypt_b64(json.dumps(extension)),
+            'User-Agent': USER_AGENT_SUBMIT
         }
 
         submit_url = root + URI_FORM_SUBMIT
         logger.info('submitting form')
-        res = await client.post(submit_url, headers=headers, json=payload, timeout=10)
+        res = await client.post(submit_url, headers=headers, json=extension, timeout=10)
+        logger.debug('server status_code: {}', res.status_code)
         res_j = res.json()
         server_code = res_j.get('code')
         server_msg = res_j.get('message')

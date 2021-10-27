@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from anti_cpdaily.example import generate_config, auto_submit_collections
 from loguru import logger
 

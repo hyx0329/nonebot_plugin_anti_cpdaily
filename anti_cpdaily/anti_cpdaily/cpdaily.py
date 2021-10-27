@@ -33,6 +33,7 @@ class AsyncCpdailyUser:
     username: str
     password: str
     school_name: Optional[str]
+    school_info: Optional[Dict]
     client: Optional[AsyncClient]
     school_api: Optional[Dict]
 
@@ -45,8 +46,9 @@ class AsyncCpdailyUser:
         self.password = password
         self.school_name = school_name
         self.school_api = None
+        self.school_info = None
         self.client = AsyncClient(verify=False)
-        self.client.headers = {'User-Agent': USER_AGENT}
+        self.client.headers = {'User-Agent': USER_AGENT_LOGIN}
     
     async def __aenter__(self):
         return self
@@ -85,6 +87,7 @@ class AsyncCpdailyUser:
             raise ValueError(f'Unsupported school! {self.school_name}')
         # school is supported, load detail infomation
         school = schools[school_idx]
+        self.school_info = school  # save current school info
         school_param = {
             'ids': school['id']
         }
@@ -96,6 +99,7 @@ class AsyncCpdailyUser:
         logger.debug(f'school info: {school_info}')
         # WTF? generate parameters?
         school_api = {
+            'tenant_id': school_info['id'],
             'ids_url': school_info['idsUrl'],
             'amp_root': '',
             'amp_login_path': '',
@@ -120,7 +124,7 @@ class AsyncCpdailyUser:
         login_url = self.school_api['amp_root'] + self.school_api['amp_login_path']
         amp_params = self.school_api['amp_login_params']
         logger.debug('fetching web page')
-        res = await self.client.get(login_url, params=amp_params, timeout=10)  # server speed is slow
+        res = await self.client.get(login_url, params=amp_params, follow_redirects=True, timeout=10)  # server speed is slow
         logger.debug('current history: {}', res.history)
         logger.debug('current url: {}', res.url)
         cas_target_url = res.url
@@ -197,7 +201,7 @@ class AsyncCpdailyUser:
         logger.debug('form data: {}'.format(login_params))
         logger.debug('target url: {}'.format(cas_target_url))
 
-        res = await self.client.post(cas_target_url, params=login_params, timeout=10)
+        res = await self.client.post(cas_target_url, params=login_params, follow_redirects=True, timeout=10)
         logger.debug('post status: {}', res.status_code)
         logger.debug('current history: {}', res.history)
         logger.debug('current url: {}', res.url)

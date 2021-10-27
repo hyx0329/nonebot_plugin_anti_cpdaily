@@ -83,7 +83,7 @@ async def fill_and_submit_collections(data_file: str):
             if form.fill_form(current_user.dict()):
                 logger.success('form({}) filled'.format(form.subject))
                 logger.info('try to submit collection({})'.format(form.subject))
-                submission_status = await form.post_form(root=cpduser.school_api.get('amp_root'), client=cpduser.client)
+                submission_status = await form.post_form(apis=cpduser.school_api, client=cpduser.client)
                 logger.info(f'submission status: {submission_status}')
                 pass
             else:
