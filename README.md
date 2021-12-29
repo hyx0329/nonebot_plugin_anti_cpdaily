@@ -17,8 +17,14 @@ IAP login is **NOT** implemented.
 - run the example script `anti_cpdaily/simple_example.py` to get a config example
 - edit the config example, fill the necessary parameters(`lon`,`lat`,`qq`)
 - also remember to fill the forms, by keeping only the wanted choices
-- create a folder names `anti_cpdaily_profiles` where your `bot.py` sits
-- move the config generated to `anti_cpdaily_profiles`
+    + type 1,5 are text field
+    + type 2 is single choice
+    + type 3 is multiple choice
+    + type 4 is unknown
+    + if it's a text field (with no default answer), put a string in the answer
+      list
+- create path `profiles/anti_cpdaily` where your `bot.py` sits
+- move the config generated to `profiles/anti_cpdaily`
 - perhaps you need to change the scheduler's config in `anti_cpdaily/schedule.py`
 - start your bot
 
@@ -37,4 +43,4 @@ exception occuring, rest of the profiles are ignored.
 
 ## License
 
-See `LICENSE`.
+GPLv3. See `LICENSE`.

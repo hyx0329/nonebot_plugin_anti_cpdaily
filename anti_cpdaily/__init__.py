@@ -16,6 +16,7 @@ else:
         anti_cpdaily_check_routine,
         anti_cpdaily_launch
     )
+    from .command import handle_command
     
 
 # Export something for other plugin
