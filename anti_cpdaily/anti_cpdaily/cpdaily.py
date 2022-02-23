@@ -161,7 +161,10 @@ class AsyncCpdailyUser:
         logger.debug('salt component from html: {}'.format(salt_tag))
         salt = None
         if len(salt_tag) > 0:
-            salt = salt_tag[0].get_text()
+            # for desktop, salt is stored in an html element
+            single_salt_tag = salt_tag[0]
+            salt = single_salt_tag.get('value')
+            logger.debug(f'salt from HTML: {salt}')
         else:
             # on mobile, the salt is stored in a javascript variable
             salt_result = re.search('(?<=var pwdDefaultEncryptSalt = ")\w{16}(?=")', raw_page_html)
