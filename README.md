@@ -43,4 +43,10 @@ exception occuring, rest of the profiles are ignored.
 
 ## License
 
-GPLv3. See `LICENSE`.
+Generally, you have 2 choices:
+
+1. General Public License version 3.0 or later. See `LICENSE_GPL`.
+2. MIT license. See `LICENSE_MIT`.
+
+Specifically, the slider-captcha-resolution module(`anti_cpdaily/anti_cpdaily/slider_captcha.py`) can be used under Mozilla Public License version 2.0 or later.
+
